@@ -48,37 +48,35 @@ source $HOME/.bash_profile
 sudo apt update && sudo apt upgrade -y
 
 # packages
-apt install curl iptables build-essential git wget jq make gcc nano tmux htop nvme-cli pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev lz4 -y
+sudo apt install curl iptables build-essential git wget jq make gcc nano tmux htop nvme-cli pkg-config libssl-dev tar clang bsdmainutils ncdu unzip libleveldb-dev lz4 screen bc fail2ban -y
 
 # install go
-ver="1.23.3" && \
-wget "https://golang.org/dl/go$ver.linux-amd64.tar.gz" && \
-sudo rm -rf /usr/local/go && \
-sudo tar -C /usr/local -xzf "go$ver.linux-amd64.tar.gz" && \
-rm "go$ver.linux-amd64.tar.gz" && \
-echo "export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin" >> $HOME/.bash_profile && \
-source $HOME/.bash_profile && \
+ver="1.23.1"
+wget "https://golang.org/dl/go$ver.linux-amd64.tar.gz"
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf "go$ver.linux-amd64.tar.gz"
+rm "go$ver.linux-amd64.tar.gz"
+echo "export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin" >> $HOME/.bash_profile
+source $HOME/.bash_profile
 go version
 
 # download binary
-cd $HOME
-git clone https://github.com/gonative-cc/gonative && cd gonative
-git checkout v0.1.1
-make build
-mv $HOME/gonative/out/gonative $HOME/go/bin/gonatived
+cd $HOME && mkdir -p go/bin/
+wget https://github.com/gonative-cc/gonative/releases/download/v0.1.1/gonative-v0.1.1-linux-amd64.gz
+gunzip gonative-v0.1.1-linux-amd64.gz
+chmod +x gonative-v0.1.1-linux-amd64
+mv gonative-v0.1.1-linux-amd64 /root/go/bin/gonatived
 
 # config
-gonatived config chain-id $NATIVE_CHAIN_ID
-gonatived config keyring-backend test
+#gonatived config chain-id $NATIVE_CHAIN_ID
+#gonatived config keyring-backend test
 
 # init
 gonatived init $NODENAME --chain-id $NATIVE_CHAIN_ID
 
 # download genesis and addrbook
-wget https://github.com/gonative-cc/network-docs/raw/refs/heads/master/genesis/genesis-testnet-1.json.gz
-gzip -d genesis-testnet-1.json.gz
-mv genesis-testnet-1.json  $HOME/.gonative/config/genesis.json
-wget -O $HOME/.gonative/config/addrbook.json "https://share102.utsa.tech/native/addrbook.json"
+wget -O $HOME/.gonative/config/addrbook.json "https://server-4.stavr.tech/Testnet/Native/addrbook.json"
+wget -O $HOME/.gonative/config/genesis.json "https://server-4.stavr.tech/Testnet/Native/genesis.json"
 
 # set minimum gas price
 sed -i -e "s|^minimum-gas-prices *=.*|minimum-gas-prices = \"0.1untiv\"|" $HOME/.gonative/config/app.toml
@@ -127,8 +125,8 @@ EOF
 
 # reset
 gonatived tendermint unsafe-reset-all --home $HOME/.gonative --keep-addr-book
-curl -o - -L https://share102.utsa.tech/native/native_testnet.tar.lz4 | lz4 -c -d - | tar -x -C $HOME/.gonative/
-mv $HOME/.gonative/priv_validator_state.json.backup $HOME/.gonative/data/priv_validator_state.json
+LATEST_SNAPSHOT=$(curl -s https://server-4.stavr.tech/Testnet/Native/ | grep -oE 'native-snap-[0-9]+\.tar\.lz4' | while read SNAPSHOT; do HEIGHT=$(curl -s "https://server-4.stavr.tech/Testnet/Native/${SNAPSHOT%.tar.lz4}-info.txt" | awk '/Block height:/ {print $3}'); echo "$SNAPSHOT $HEIGHT"; done | sort -k2 -nr | head -n 1 | awk '{print $1}')
+curl -o - -L https://server-4.stavr.tech/Testnet/Native/$LATEST_SNAPSHOT | lz4 -c -d - | tar -x -C $HOME/.gonative
 
 # start service
 sudo systemctl daemon-reload
